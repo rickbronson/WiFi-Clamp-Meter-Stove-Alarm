@@ -39,7 +39,8 @@ struct MAIN_DATA
 	uint8 *pRcvHead;
 	uint8 *pRcvTail;
 
-#define TICKS_PER_SEC 200  /* speed at which main_loop runs, make undivisible by line freq */
+	int total;  /* used for calculating percent */
+#define TICKS_PER_SEC 59  /* speed at which main_loop runs, make undivisible by line freq */
 	uint16_t adc_buf[TICKS_PER_SEC];
 	uint32_t adc_index;
 	uint32_t adc_max;  /* about 465-530 for 0W, 786-810 for 100W, 984-1018 : 1500W */

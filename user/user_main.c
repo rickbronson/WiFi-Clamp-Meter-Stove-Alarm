@@ -90,12 +90,12 @@ static void time_cb(struct tm *dt)
 
 static void stove_check(struct MAIN_DATA *p_data)  /* runs once every sec */
 	{
-	int cntr, start, head_dx, old_val, val, total, no_activity_cntr, cycles, event = 0;
+	int cntr, start, head_dx, old_val, val, no_activity_cntr, cycles, event = 0;
 
   /* go over all samples, total = number of sec's over threshold of array */
 	start = ARRAY_SIZE(p_data->samplebuf) * BITS_PER_BYTE;
 	no_activity_cntr = cycles = old_val = 0;
-	total = 0;  /* number of sec's there was current draw over 120 min's */
+	p_data->total = 0;  /* number of sec's there was current draw over 120 min's */
 	head_dx = p_data->head_dx + BITS_PER_BYTE;  /* start with the oldest one */
 	if (head_dx >= ARRAY_SIZE(p_data->samplebuf) * BITS_PER_BYTE)
 		head_dx -= ARRAY_SIZE(p_data->samplebuf) * BITS_PER_BYTE;
@@ -105,7 +105,7 @@ static void stove_check(struct MAIN_DATA *p_data)  /* runs once every sec */
 			val = 1;
 		else
 			val = 0;
-		total += val;
+		p_data->total += val;
 		if ((val && !old_val) || (!val && old_val))
 			{
 			cycles++;  /* count half cycles */
@@ -117,7 +117,7 @@ static void stove_check(struct MAIN_DATA *p_data)  /* runs once every sec */
 			{
 			if (++no_activity_cntr >= 30 * SECS_PER_MIN)  /* 30 min's with no activity? */
 				{
-				total = 0;  /* start over */
+				p_data->total = 0;  /* start over */
 				cycles = 0;
 				}
 			}
@@ -126,7 +126,7 @@ static void stove_check(struct MAIN_DATA *p_data)  /* runs once every sec */
 		if (++head_dx >= ARRAY_SIZE(p_data->samplebuf) * BITS_PER_BYTE)
 			head_dx = 0;
 		}
-	if ((total > (ARRAY_SIZE(p_data->samplebuf) * BITS_PER_BYTE) / (100 / ADC_PERCENT_THRESHOLD)) || /* over percent threshold? */
+	if ((p_data->total > (ARRAY_SIZE(p_data->samplebuf) * BITS_PER_BYTE) / (100 / ADC_PERCENT_THRESHOLD)) || /* over percent threshold? */
 		cycles > MAX_HALF_CYCLES)  /* more than max cycles? */
 		if (ARRAY_SIZE(p_data->samplebuf) * BITS_PER_BYTE - start > SECS_PER_HR * 1.5)  /* did the first occurance happen over 1.5 hours ago? */
 			if (p_data->adc_result > p_data->threshold)  /* over threshold at this time? */
@@ -134,7 +134,7 @@ static void stove_check(struct MAIN_DATA *p_data)  /* runs once every sec */
 
 #ifdef DEBUG_APP
 	debug("per=%3d noact=%3d cycles=%3d start=%3d adc=%2d state=%d \r\n", 
-		total * 100 / (ARRAY_SIZE(p_data->samplebuf) * BITS_PER_BYTE), no_activity_cntr, cycles, start, (int) p_data->adc_result, (int) p_data->adc_state);
+		p_data->total * 100 / (ARRAY_SIZE(p_data->samplebuf) * BITS_PER_BYTE), no_activity_cntr, cycles, start, (int) p_data->adc_result, (int) p_data->adc_state);
 #endif
 
 	switch (p_data->adc_state)
@@ -218,9 +218,19 @@ static void ICACHE_FLASH_ATTR main_loop(struct MAIN_DATA *p_data)
 			p_data->adc_result = 0;
 
 		rst = system_get_rst_info();
-		os_sprintf(p_data->buf, "loop=%4d, adc: result=%d over66=%d cnt=%d max=%d date=%d/%d/%d %d:%02d:%02d heap=%dk rssi=%d mode=%s boot=%d\r\n",
-			p_data->loop_cntr++, (int) p_data->adc_result, temp, (int) p_data->adc_index, (int) p_data->adc_max,
-			p_data->dt.tm_mon + 1, p_data->dt.tm_mday, p_data->dt.tm_year + 1900, p_data->dt.tm_hour, p_data->dt.tm_min, p_data->dt.tm_sec,
+		os_sprintf(p_data->buf, "loop=%4d, per=%3d adc: result=%d over66=%d cnt=%d max=%d date=%d/%d/%d %d:%02d:%02d heap=%dk rssi=%d mode=%s boot=%d\r\n",
+			p_data->loop_cntr++,
+			p_data->total * 100 / (ARRAY_SIZE(p_data->samplebuf) * BITS_PER_BYTE),
+			(int) p_data->adc_result,
+			temp,
+			(int) p_data->adc_index,
+			(int) p_data->adc_max,
+			p_data->dt.tm_mon + 1,
+			p_data->dt.tm_mday,
+			p_data->dt.tm_year + 1900,
+			p_data->dt.tm_hour,
+			p_data->dt.tm_min,
+			p_data->dt.tm_sec,
 			system_get_free_heap_size() / 1000,
 			wifi_station_get_rssi(),
 			mode_lut[wifi_get_opmode()],
